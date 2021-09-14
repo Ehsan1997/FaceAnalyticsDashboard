@@ -76,8 +76,11 @@ app.layout = html.Div(children=[
 
 @app.callback(Output('file_update_time', 'data'), Input('interval_component', 'n_intervals'))
 def check_file_for_update(n):
-    stats_obj.update_data()
-    return ('mtime', getmtime(stats_file))
+    current_mtime = getmtime(stats_file)
+    if current_mtime > stats_obj.mtime or n == 0:
+        stats_obj.update_data()
+        return getmtime(stats_file)
+    return dash.no_update
 
 
 @app.callback(Output('recent_faces', 'children'), Input('file_update_time', 'data'))
@@ -110,17 +113,21 @@ def update_large_graph(data):
 
 
 @app.callback(Output('small_graph', 'figure'),
-              Input({'type': 'face_img', 'index': ALL}, 'n_clicks'),
+              Input({'type': 'face_img', 'index': ALL}, 'n_clicks_timestamp'),
               State({'type': 'face_img', 'index': ALL}, 'id'))
-def update_small_graph(n_clicks, element_id):
-    # Loop and find index of clicked element
-    is_clicked = False
-    for i in range(len(n_clicks)):
-        if n_clicks[i] is not None:
-            is_clicked = True
-            break
-    if is_clicked:
-        person_id = element_id[i]['index']
+def update_small_graph(n_clicks_timestamp, element_id):
+    # TODO: Bug in the code, some malfunction clicks happening. (Fix could be to use separate ids for frequent and
+    #  recent faces).
+    current_max = 0
+    max_idx = None
+    for i, val in enumerate(n_clicks_timestamp):
+        if val is not None and val > current_max:
+            current_max = val
+            max_idx = i
+    if max_idx:
+        person_id = element_id[max_idx]['index']
+        print(element_id)
+        print(f'{max_idx} was CLICKED!')
         return_figure = px.bar(
             pd.DataFrame(
                 stats_obj.get_time_frequency_of_id(int(person_id)),
@@ -132,9 +139,6 @@ def update_small_graph(n_clicks, element_id):
         )
         return return_figure
     return dash.no_update
-
-
-
 
 
 
